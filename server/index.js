@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -13,7 +14,7 @@ import {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/littlesteps_childcare';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://Shivam_Kumar:shivam%402004@ac-isaf8cc-shard-00-00.fvm9mni.mongodb.net:27017,ac-isaf8cc-shard-00-01.fvm9mni.mongodb.net:27017,ac-isaf8cc-shard-00-02.fvm9mni.mongodb.net:27017/childcare?ssl=true&replicaSet=atlas-13wo3n-shard-0&authSource=admin&appName=Pregrad';
 
 app.use(cors());
 app.use(express.json());
@@ -28,33 +29,36 @@ let memoryVerification = [...INITIAL_VERIFICATION_QUEUE];
 // MongoDB Connection & Auto-Seed Function
 async function connectDB() {
   try {
-    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
+    await mongoose.connect(MONGODB_URI, { 
+      serverSelectionTimeoutMS: 5000 
+    });
     isMongoConnected = true;
-    console.log('🍃 Connected to MongoDB Database successfully (littlesteps_childcare)');
+    console.log('🍃 Connected to MongoDB Atlas Database successfully (childcare)');
 
     // Seed Centers if collection empty
     const countCenters = await Center.countDocuments();
     if (countCenters === 0) {
       await Center.insertMany(INITIAL_DAYCARE_CENTERS);
-      console.log('🌱 Seeded initial Daycare Centers into MongoDB');
+      console.log('🌱 Seeded initial Daycare Centers into MongoDB Atlas');
     }
 
     // Seed Bookings if collection empty
     const countBookings = await Booking.countDocuments();
     if (countBookings === 0) {
       await Booking.insertMany(INITIAL_BOOKINGS);
-      console.log('🌱 Seeded initial Bookings into MongoDB');
+      console.log('🌱 Seeded initial Bookings into MongoDB Atlas');
     }
 
     // Seed Verification Queue if collection empty
     const countVer = await Verification.countDocuments();
     if (countVer === 0) {
       await Verification.insertMany(INITIAL_VERIFICATION_QUEUE);
-      console.log('🌱 Seeded initial Verification Queue into MongoDB');
+      console.log('🌱 Seeded initial Verification Queue into MongoDB Atlas');
     }
   } catch (err) {
     isMongoConnected = false;
-    console.log('⚠️ MongoDB connection offline. Operating with Express In-Memory REST API mode.');
+    console.error('⚠️ MongoDB Atlas connection error:', err.message);
+    console.log('⚠️ Operating with Express In-Memory REST API mode fallback.');
   }
 }
 
@@ -195,15 +199,27 @@ app.patch('/api/verification/:id', async (req, res) => {
 
 // ANALYTICS Endpoint
 app.get('/api/analytics', async (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      ...PLATFORM_ANALYTICS,
-      databaseType: isMongoConnected ? 'MongoDB (Active)' : 'Express Seed DB',
-      activeBookingsCount: memoryBookings.length,
-      totalCentersCount: memoryCenters.length
+  try {
+    let activeBookingsCount = memoryBookings.length;
+    let totalCentersCount = memoryCenters.length;
+
+    if (isMongoConnected) {
+      activeBookingsCount = await Booking.countDocuments();
+      totalCentersCount = await Center.countDocuments();
     }
-  });
+
+    res.json({
+      success: true,
+      data: {
+        ...PLATFORM_ANALYTICS,
+        databaseType: isMongoConnected ? 'MongoDB Atlas (Active)' : 'Express In-Memory Fallback',
+        activeBookingsCount,
+        totalCentersCount
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

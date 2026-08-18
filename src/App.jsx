@@ -25,6 +25,17 @@ import {
 } from './data/mockData';
 import { SlidersHorizontal, Moon, ShieldCheck, HeartHandshake, CheckCircle2 } from 'lucide-react';
 
+import { 
+  fetchApiHealth, 
+  fetchCenters, 
+  fetchBookings, 
+  fetchVerificationQueue, 
+  createNewBooking, 
+  updateBookingStatus, 
+  updateCenterDetails, 
+  updateVerificationStatus 
+} from './services/api';
+
 export default function App() {
   // App state with localStorage persistence
   const [currentRole, setCurrentRole] = useState('parent'); // 'parent' | 'provider' | 'admin'
@@ -62,8 +73,27 @@ export default function App() {
 
   // Toast message
   const [toastMessage, setToastMessage] = useState('');
+  const [dbMode, setDbMode] = useState('Connecting...');
 
-  // Persist states
+  // Fetch initial data from Express / MongoDB API service
+  useEffect(() => {
+    async function loadDataFromApi() {
+      const health = await fetchApiHealth();
+      if (health && health.dbStatus) setDbMode(health.dbStatus);
+
+      const centersRes = await fetchCenters();
+      if (centersRes.success && centersRes.data?.length > 0) setCenters(centersRes.data);
+
+      const bookingsRes = await fetchBookings();
+      if (bookingsRes.success && bookingsRes.data?.length > 0) setBookings(bookingsRes.data);
+
+      const verRes = await fetchVerificationQueue();
+      if (verRes.success && verRes.data?.length > 0) setVerificationQueue(verRes.data);
+    }
+    loadDataFromApi();
+  }, []);
+
+  // Persist states locally as backup
   useEffect(() => {
     localStorage.setItem('ls_centers', JSON.stringify(centers));
   }, [centers]);
@@ -99,65 +129,75 @@ export default function App() {
     return matchesQuery && matches24x7 && matchesAge && matchesTiming;
   });
 
-  // Booking handlers
-  const handleBookingSuccess = (newBooking) => {
+  // Booking handlers with API service call
+  const handleBookingSuccess = async (newBooking) => {
     setBookings([newBooking, ...bookings]);
     setSelectedCenterForBooking(null);
     setActiveTab('my-bookings');
     showToast(`Booking ${newBooking.id} created successfully! SMS notification sent.`);
+    await createNewBooking(newBooking);
   };
 
-  const handleCancelBooking = (bookingId) => {
+  const handleCancelBooking = async (bookingId) => {
     setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
     showToast(`Booking ${bookingId} has been cancelled.`);
+    await updateBookingStatus(bookingId, 'Cancelled');
   };
 
-  // Provider handlers
-  const handleAcceptBooking = (id) => {
+  // Provider handlers with API service call
+  const handleAcceptBooking = async (id) => {
     setBookings(bookings.map(b => b.id === id ? { ...b, status: 'Confirmed' } : b));
     showToast(`Booking request ${id} accepted!`);
+    await updateBookingStatus(id, 'Confirmed');
   };
 
-  const handleRejectBooking = (id) => {
+  const handleRejectBooking = async (id) => {
     setBookings(bookings.map(b => b.id === id ? { ...b, status: 'Rejected' } : b));
     showToast(`Booking request ${id} declined.`);
+    await updateBookingStatus(id, 'Rejected');
   };
 
-  const handleSaveCenter = (updatedCenter) => {
+  const handleSaveCenter = async (updatedCenter) => {
     setCenters(centers.map(c => c.id === updatedCenter.id ? updatedCenter : c));
     showToast(`Daycare details updated!`);
+    await updateCenterDetails(updatedCenter.id, updatedCenter);
   };
 
-  const handleToggle24x7 = () => {
+  const handleToggle24x7 = async () => {
     const primaryCenter = centers[0];
     const updated = { ...primaryCenter, is24x7: !primaryCenter.is24x7 };
     setCenters(centers.map(c => c.id === updated.id ? updated : c));
     showToast(`24×7 Operating Mode ${updated.is24x7 ? 'Activated' : 'Deactivated'}`);
+    await updateCenterDetails(updated.id, { is24x7: updated.is24x7 });
   };
 
-  const handleAddCaregiver = (newCg) => {
+  const handleAddCaregiver = async (newCg) => {
     const primaryCenter = centers[0];
     const updated = { ...primaryCenter, caregivers: [...primaryCenter.caregivers, newCg] };
     setCenters(centers.map(c => c.id === updated.id ? updated : c));
     showToast(`Caregiver ${newCg.name} added to roster!`);
+    await updateCenterDetails(updated.id, { caregivers: updated.caregivers });
   };
 
-  const handleDeleteCaregiver = (cgId) => {
+  const handleDeleteCaregiver = async (cgId) => {
     const primaryCenter = centers[0];
     const updated = { ...primaryCenter, caregivers: primaryCenter.caregivers.filter(cg => cg.id !== cgId) };
     setCenters(centers.map(c => c.id === updated.id ? updated : c));
     showToast(`Caregiver removed from roster.`);
+    await updateCenterDetails(updated.id, { caregivers: updated.caregivers });
   };
 
-  // Admin handlers
-  const handleApproveApplicant = (id) => {
+  // Admin handlers with API service call
+  const handleApproveApplicant = async (id) => {
     setVerificationQueue(verificationQueue.map(v => v.id === id ? { ...v, status: 'Approved' } : v));
     showToast(`Applicant ${id} approved & verified!`);
+    await updateVerificationStatus(id, 'Approved');
   };
 
-  const handleRejectApplicant = (id) => {
+  const handleRejectApplicant = async (id) => {
     setVerificationQueue(verificationQueue.map(v => v.id === id ? { ...v, status: 'Rejected' } : v));
     showToast(`Applicant ${id} rejected.`);
+    await updateVerificationStatus(id, 'Rejected');
   };
 
   return (
@@ -179,6 +219,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         openPrdModal={() => setIsPrdOpen(true)}
         openChatModal={() => setIsChatOpen(true)}
+        dbMode={dbMode}
       />
 
       {/* Main View Router */}

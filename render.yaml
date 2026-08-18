@@ -1,0 +1,12 @@
+services:
+  # Express Backend Web Service on Render
+  - type: web
+    name: childcare-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: MONGODB_URI
+        value: mongodb://Shivam_Kumar:shivam%402004@ac-isaf8cc-shard-00-00.fvm9mni.mongodb.net:27017,ac-isaf8cc-shard-00-01.fvm9mni.mongodb.net:27017,ac-isaf8cc-shard-00-02.fvm9mni.mongodb.net:27017/childcare?ssl=true&replicaSet=atlas-13wo3n-shard-0&authSource=admin&appName=Pregrad
+      - key: NODE_VERSION
+        value: 20

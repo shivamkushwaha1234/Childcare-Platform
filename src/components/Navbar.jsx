@@ -18,7 +18,8 @@ export default function Navbar({
   activeTab, 
   setActiveTab, 
   openPrdModal, 
-  openChatModal 
+  openChatModal,
+  dbMode
 }) {
   return (
     <header className="navbar">
@@ -35,6 +36,14 @@ export default function Navbar({
             </div>
           </div>
         </a>
+
+        {/* Database Status Badge */}
+        {dbMode && (
+          <div className="badge badge-verified" style={{ fontSize: '0.75rem', gap: '0.35rem', backgroundColor: 'var(--bg-subtle)' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dbMode.includes('Connected') ? '#10B981' : '#F59E0B', display: 'inline-block' }}></span>
+            {dbMode}
+          </div>
+        )}
 
         {/* Role Switcher (Parent, Provider, Admin) */}
         <div className="role-switcher-box">
